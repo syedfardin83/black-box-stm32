@@ -60,7 +60,8 @@ SPI_HandleTypeDef hspi1;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-uint8_t acc_buffer[2];
+uint8_t acc_buffer[6];
+uint8_t flag=0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -95,9 +96,7 @@ uint8_t MPU6050_WakeUp(I2C_HandleTypeDef *i2c){
 }
 
 void MPU6050_Read_DMA() {
-    if(HAL_I2C_Mem_Read_DMA(&hi2c1, MPU6050_ADDR<<1 , REG_ACCEL_XOUT_H, I2C_MEMADD_SIZE_8BIT, acc_buffer, 2)==HAL_OK)
-    	printf("\nDMA initiation success!");
-    else
+    if(HAL_I2C_Mem_Read_DMA(&hi2c1, MPU6050_ADDR<<1 , REG_ACCEL_XOUT_H, I2C_MEMADD_SIZE_8BIT, acc_buffer, 6)!=HAL_OK)
     	printf("\nDMA initiation failed!");
 
 }
@@ -105,7 +104,8 @@ void MPU6050_Read_DMA() {
 
 void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
     if (hi2c->Instance == I2C1) {
-    	printf("\nReading through DMA complete!");
+//    	printf("\nReading through DMA complete!");
+    	flag=1;
     }
 }
 
@@ -171,7 +171,19 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
+	  if(flag==1){
+		  float acc[3];
 
+		  acc[0]=(((int16_t)(acc_buffer[0]<<8 | acc_buffer[1]))/16384.0);
+		  acc[1]=(((int16_t)(acc_buffer[2]<<8 | acc_buffer[3]))/16384.0);
+		  acc[2]=(((int16_t)(acc_buffer[4]<<8 | acc_buffer[5]))/16384.0);
+
+		  printf("\n%.2f %.2f %.2f",acc[0],acc[1],acc[2]);
+
+		  flag=0;
+		  MPU6050_Read_DMA();
+
+	  }
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
