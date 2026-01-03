@@ -18,11 +18,10 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "stdio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "stdio.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -61,7 +60,7 @@ SPI_HandleTypeDef hspi1;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-uint8_t acc_buffer[6];
+uint8_t acc_buffer[2];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -96,7 +95,7 @@ uint8_t MPU6050_WakeUp(I2C_HandleTypeDef *i2c){
 }
 
 void MPU6050_Read_DMA() {
-    if(HAL_I2C_Mem_Read_DMA(&hi2c1, MPU6050_ADDR<<1 , REG_ACCEL_XOUT_H, 1, acc_buffer, 6)==HAL_OK)
+    if(HAL_I2C_Mem_Read_DMA(&hi2c1, MPU6050_ADDR<<1 , REG_ACCEL_XOUT_H, I2C_MEMADD_SIZE_8BIT, acc_buffer, 2)==HAL_OK)
     	printf("\nDMA initiation success!");
     else
     	printf("\nDMA initiation failed!");
@@ -106,8 +105,8 @@ void MPU6050_Read_DMA() {
 
 void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
     if (hi2c->Instance == I2C1) {
-    }
     	printf("\nReading through DMA complete!");
+    }
 }
 
 /* USER CODE END 0 */
