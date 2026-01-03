@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "stdio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -31,7 +32,17 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define MPU6050_ADDR 0x68
 
+#define REG_PWR_MGMT_1 0x6b
+#define REG_WHO_AM_I 0x75
+#define REG_ACCEL_XOUT_L  0x3c
+#define REG_ACCEL_XOUT_H 0x3b
+#define REG_ACCEL_YOUT_H 0x3d
+#define REG_ACCEL_ZOUT_H 0x3f
+#define REG_GYRO_XOUT_H 0x43
+#define REG_GYRO_YOUT_H 0x45
+#define REG_GYRO_ZOUT_H 0x47
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -50,7 +61,7 @@ SPI_HandleTypeDef hspi1;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-
+uint8_t acc_buffer[6];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -67,6 +78,37 @@ static void MX_USART2_UART_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+int _write(int file, char *ptr, int len){
+	HAL_StatusTypeDef hstatus;
+	hstatus = HAL_UART_Transmit(&huart2,(uint8_t *)ptr, len, HAL_MAX_DELAY);
+	if(hstatus==HAL_OK)
+		return len;
+	else
+		return -1;
+}
+
+uint8_t MPU6050_WakeUp(I2C_HandleTypeDef *i2c){
+	uint8_t data = 0x0;
+	if(HAL_I2C_Mem_Write(i2c,MPU6050_ADDR<<1,REG_PWR_MGMT_1,1,&data,1,100)==HAL_OK)
+		return 1;
+	else
+		return 0;
+}
+
+void MPU6050_Read_DMA() {
+    if(HAL_I2C_Mem_Read_DMA(&hi2c1, MPU6050_ADDR<<1 , REG_ACCEL_XOUT_H, 1, acc_buffer, 6)==HAL_OK)
+    	printf("\nDMA initiation success!");
+    else
+    	printf("\nDMA initiation failed!");
+
+}
+
+
+void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
+    if (hi2c->Instance == I2C1) {
+    }
+    	printf("\nReading through DMA complete!");
+}
 
 /* USER CODE END 0 */
 
@@ -105,7 +147,24 @@ int main(void)
   MX_SPI1_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
+  printf("*****************Started MPU code***********************\n");
+  printf("Waking up the sensor now.");
+    uint8_t stat = MPU6050_WakeUp(&hi2c1);
+    if(stat==1)
+  	  printf("\nSensor woke up!");
+    else
+  	  printf("\nFailed to wake up sensor!");
 
+    HAL_Delay(500);
+    printf("\nStarting DMA...");
+    MPU6050_Read_DMA();
+    printf("\nDMA exited!");
+//	uint8_t data = 0x0;
+//  if(HAL_I2C_Mem_Write(&hi2c1,MPU6050_ADDR<<1,REG_PWR_MGMT_1,1,&data,1,2000)==HAL_OK)
+//	  printf("\nSensor woke up!");
+//  else
+//	  printf("\nFailed to wake up sensor!");
+    HAL_Delay(1000);
   /* USER CODE END 2 */
 
   /* Infinite loop */
