@@ -32,7 +32,17 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define MPU6050_ADDR 0x68
 
+#define REG_PWR_MGMT_1 0x6b
+#define REG_WHO_AM_I 0x75
+#define REG_ACCEL_XOUT_L  0x3c
+#define REG_ACCEL_XOUT_H 0x3b
+#define REG_ACCEL_YOUT_H 0x3d
+#define REG_ACCEL_ZOUT_H 0x3f
+#define REG_GYRO_XOUT_H 0x43
+#define REG_GYRO_YOUT_H 0x45
+#define REG_GYRO_ZOUT_H 0x47
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -62,10 +72,20 @@ osThreadId_t CalculateHandle;
 const osThreadAttr_t Calculate_attributes = {
   .name = "Calculate",
   .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityLow,
+  .priority = (osPriority_t) osPriorityAboveNormal,
+};
+/* Definitions for Readi2cSem */
+osSemaphoreId_t Readi2cSemHandle;
+const osSemaphoreAttr_t Readi2cSem_attributes = {
+  .name = "Readi2cSem"
+};
+/* Definitions for CalculateSem */
+osSemaphoreId_t CalculateSemHandle;
+const osSemaphoreAttr_t CalculateSem_attributes = {
+  .name = "CalculateSem"
 };
 /* USER CODE BEGIN PV */
-
+uint8_t acc_buffer[6];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -85,7 +105,21 @@ void calculate(void *argument);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+int _write(int file, char *ptr, int len){
+	HAL_StatusTypeDef hstatus;
+	hstatus = HAL_UART_Transmit(&huart2,(uint8_t *)ptr, len, HAL_MAX_DELAY);
+	if(hstatus==HAL_OK)
+		return len;
+	else
+		return -1;
+}
 
+void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
+    if (hi2c->Instance == I2C1) {
+//    	printf("\nReading through DMA complete!");
+    	osSemaphoreRelease(CalculateSemHandle);
+    }
+}
 /* USER CODE END 0 */
 
 /**
@@ -132,6 +166,13 @@ int main(void)
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
   /* USER CODE END RTOS_MUTEX */
+
+  /* Create the semaphores(s) */
+  /* creation of Readi2cSem */
+  Readi2cSemHandle = osSemaphoreNew(1, 1, &Readi2cSem_attributes);
+
+  /* creation of CalculateSem */
+  CalculateSemHandle = osSemaphoreNew(1, 0, &CalculateSem_attributes);
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
   /* add semaphores, ... */
@@ -529,6 +570,10 @@ void readi2c(void *argument)
   /* Infinite loop */
   for(;;)
   {
+	if(osSemaphoreAcquire(Readi2cSemHandle,osWaitForever)==osOK){
+		if(HAL_I2C_Mem_Read_DMA(&hi2c1, MPU6050_ADDR<<1 , REG_ACCEL_XOUT_H, I2C_MEMADD_SIZE_8BIT, acc_buffer, 6)!=HAL_OK)
+		    	printf("\nDMA initiation failed!");
+	}
     osDelay(1);
   }
   /* USER CODE END 5 */
@@ -547,6 +592,17 @@ void calculate(void *argument)
   /* Infinite loop */
   for(;;)
   {
+	if(osSemaphoreAcquire(CalculateSemHandle,osWaitForever)==osOK){
+		float acc[3];
+
+		acc[0]=(((int16_t)(acc_buffer[0]<<8 | acc_buffer[1]))/16384.0);
+		acc[1]=(((int16_t)(acc_buffer[2]<<8 | acc_buffer[3]))/16384.0);
+		acc[2]=(((int16_t)(acc_buffer[4]<<8 | acc_buffer[5]))/16384.0);
+
+		printf("\n%.2f %.2f %.2f",acc[0],acc[1],acc[2]);
+
+    	osSemaphoreRelease(Readi2cSemHandle);
+	}
     osDelay(1);
   }
   /* USER CODE END calculate */
