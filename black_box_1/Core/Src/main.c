@@ -22,7 +22,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "stdio.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -71,7 +71,7 @@ const osThreadAttr_t Read_I2C_attributes = {
 osThreadId_t CalculateHandle;
 const osThreadAttr_t Calculate_attributes = {
   .name = "Calculate",
-  .stack_size = 128 * 4,
+  .stack_size = 512 * 4,
   .priority = (osPriority_t) osPriorityAboveNormal,
 };
 /* Definitions for Readi2cSem */
@@ -86,6 +86,8 @@ const osSemaphoreAttr_t CalculateSem_attributes = {
 };
 /* USER CODE BEGIN PV */
 uint8_t acc_buffer[6];
+float acc[3];
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -119,6 +121,14 @@ void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
 //    	printf("\nReading through DMA complete!");
     	osSemaphoreRelease(CalculateSemHandle);
     }
+}
+
+uint8_t MPU6050_WakeUp(I2C_HandleTypeDef *i2c){
+	uint8_t data = 0x0;
+	if(HAL_I2C_Mem_Write(i2c,MPU6050_ADDR<<1,REG_PWR_MGMT_1,1,&data,1,100)==HAL_OK)
+		return 1;
+	else
+		return 0;
 }
 /* USER CODE END 0 */
 
@@ -157,7 +167,13 @@ int main(void)
   MX_SPI1_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-
+  printf("*****************Started MPU code***********************\n");
+  printf("Waking up the sensor now.");
+    uint8_t stat = MPU6050_WakeUp(&hi2c1);
+    if(stat==1)
+  	  printf("\nSensor woke up!");
+    else
+  	  printf("\nFailed to wake up sensor!");
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -567,14 +583,17 @@ static void MX_GPIO_Init(void)
 void readi2c(void *argument)
 {
   /* USER CODE BEGIN 5 */
+//printf("\nRead i2c task started");
   /* Infinite loop */
   for(;;)
   {
+//	printf("\nTrying to aquire read semph");
 	if(osSemaphoreAcquire(Readi2cSemHandle,osWaitForever)==osOK){
+//		printf("\nReading i2c...");
 		if(HAL_I2C_Mem_Read_DMA(&hi2c1, MPU6050_ADDR<<1 , REG_ACCEL_XOUT_H, I2C_MEMADD_SIZE_8BIT, acc_buffer, 6)!=HAL_OK)
 		    	printf("\nDMA initiation failed!");
 	}
-    osDelay(1);
+    osDelay(5);
   }
   /* USER CODE END 5 */
 }
@@ -589,21 +608,24 @@ void readi2c(void *argument)
 void calculate(void *argument)
 {
   /* USER CODE BEGIN calculate */
+//	printf("\nCalculate task started");
   /* Infinite loop */
   for(;;)
   {
 	if(osSemaphoreAcquire(CalculateSemHandle,osWaitForever)==osOK){
-		float acc[3];
+//		printf("\nCalculating...");
 
 		acc[0]=(((int16_t)(acc_buffer[0]<<8 | acc_buffer[1]))/16384.0);
 		acc[1]=(((int16_t)(acc_buffer[2]<<8 | acc_buffer[3]))/16384.0);
 		acc[2]=(((int16_t)(acc_buffer[4]<<8 | acc_buffer[5]))/16384.0);
 
 		printf("\n%.2f %.2f %.2f",acc[0],acc[1],acc[2]);
+//		printf("\n%d %d",acc_buffer[0],acc_buffer[1]);
+//		printf("\nReleasing Readi2cSem...");
 
     	osSemaphoreRelease(Readi2cSemHandle);
 	}
-    osDelay(1);
+    osDelay(5);
   }
   /* USER CODE END calculate */
 }
