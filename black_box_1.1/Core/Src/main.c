@@ -22,7 +22,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "stdio.h"
+#include "math.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -32,7 +33,17 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define MPU6050_ADDR 0x68
 
+#define REG_PWR_MGMT_1 0x6b
+#define REG_WHO_AM_I 0x75
+#define REG_ACCEL_XOUT_L  0x3c
+#define REG_ACCEL_XOUT_H 0x3b
+#define REG_ACCEL_YOUT_H 0x3d
+#define REG_ACCEL_ZOUT_H 0x3f
+#define REG_GYRO_XOUT_H 0x43
+#define REG_GYRO_YOUT_H 0x45
+#define REG_GYRO_ZOUT_H 0x47
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -54,7 +65,7 @@ UART_HandleTypeDef huart2;
 osThreadId_t calculateTaskHandle;
 const osThreadAttr_t calculateTask_attributes = {
   .name = "calculateTask",
-  .stack_size = 128 * 4,
+  .stack_size = 512 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for sem1 */
@@ -63,9 +74,11 @@ const osSemaphoreAttr_t sem1_attributes = {
   .name = "sem1"
 };
 /* USER CODE BEGIN PV */
-uint8_t buffer[28];
+uint8_t buffer[2][14];
 float acc[3];
 float gyro[3];
+volatile int dma_read_next=0;
+float ff_threshhold=0.1;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -93,10 +106,15 @@ int _write(int file, char *ptr, int len){
 		return -1;
 }
 
+
 void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
     if (hi2c->Instance == I2C1) {
 //    	printf("\nReading through DMA complete!");
+    	HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_10);
     	osSemaphoreRelease(sem1Handle);
+    	dma_read_next = (dma_read_next==0)?1:0;
+    	HAL_I2C_Mem_Read_DMA(&hi2c1, MPU6050_ADDR << 1, REG_ACCEL_XOUT_H,
+    	                             1, buffer[dma_read_next], 14);
     }
 }
 /* USER CODE END 0 */
@@ -483,7 +501,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOH_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, PA15_RESERVED_Pin|PA12_RESERVED_Pin|PA1_RESERVED_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, PA15_RESERVED_Pin|PA12_RESERVED_Pin|GPIO_PIN_10|PA1_RESERVED_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOC, PC1_RESERVED_Pin|PC0_RESERVED_Pin|PC2_RESERVED_Pin, GPIO_PIN_RESET);
@@ -506,6 +524,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(PC13_RESERVED_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PA10 */
+  GPIO_InitStruct.Pin = GPIO_PIN_10;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pins : PC1_RESERVED_Pin PC0_RESERVED_Pin PC2_RESERVED_Pin */
   GPIO_InitStruct.Pin = PC1_RESERVED_Pin|PC0_RESERVED_Pin|PC2_RESERVED_Pin;
@@ -540,26 +565,67 @@ static void MX_GPIO_Init(void)
 void Calculate(void *argument)
 {
   /* USER CODE BEGIN 5 */
-	int offset=0;
+	uint8_t data = 0x0;
+	printf("\nWaking sensor!");
+	if(HAL_I2C_Mem_Write(&hi2c1,MPU6050_ADDR<<1,REG_PWR_MGMT_1,1,&data,1,2000)==HAL_OK)
+		printf("\nSensor woke up!");
+	else
+		printf("\nSensor wake up failed!");
+printf("\nStarted Calculate task...");
+printf("\nStarting DMA...");
+	if(HAL_I2C_Mem_Read_DMA(&hi2c1, MPU6050_ADDR<<1 , REG_ACCEL_XOUT_H, 1, buffer[dma_read_next], 14)!=HAL_OK)
+	    	printf("\nDMA initiation failed!");
+//	int offset=0;
+	volatile int calc_read_next=0;
+	float net_acc=0;
+	uint8_t ff_detected=0;
+	printf("\nDMA initialized!");
   /* Infinite loop */
   for(;;)
   {
-	  if(osSemaphoreAquire(sem1Handle,osWaitForever)==osOK){
-		  //Start calculation:
-		  acc[0]=(((int16_t)(buffer[0+offset]<<8 | buffer[1+offset]))/16384.0);
-		  acc[1]=(((int16_t)(buffer[2+offset]<<8 | buffer[3+offset]))/16384.0);
-		  acc[2]=(((int16_t)(buffer[4+offset]<<8 | buffer[5+offset]))/16384.0);
+//	  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_10);
+//	  printf("\nWaiting for semaphore...");
+	  if(osSemaphoreAcquire(sem1Handle,osWaitForever)==osOK){
+//		  //Start calculation:
+		  acc[0]=(((int16_t)(buffer[calc_read_next][0]<<8 | buffer[calc_read_next][1]))/16384.0);
+		  acc[1]=(((int16_t)(buffer[calc_read_next][2]<<8 | buffer[calc_read_next][3]))/16384.0);
+		  acc[2]=(((int16_t)(buffer[calc_read_next][4]<<8 | buffer[calc_read_next][5]))/16384.0);
 
-		  gyro[0]=(((int16_t)(buffer[8+offset]<<8 | buffer[9+offset]))/16384.0);
-		  gyro[1]=(((int16_t)(buffer[10+offset]<<8 | buffer[11+offset]))/16384.0);
-		  gyro[2]=(((int16_t)(buffer[12+offset]<<8 | buffer[13+offset]))/16384.0);
+		  net_acc=sqrt(acc[0]*acc[0] + acc[1]*acc[1] + acc[2]*acc[2]);
+		  if(ff_detected==0){
+		  printf("\nNet Accel: %f",net_acc);
+		  }
+		  if(net_acc<ff_threshhold){
+			  printf("\n*****************Free fall detected!! ***************");
+			  ff_detected=1;
 
-		printf("\n%.2f %.2f %.2f %.2f %.2f %.2f",acc[0],acc[1],acc[2], gyro[0],gyro[1],gyro[2]);
+		  }
+
+//		  gyro[0]=(((int16_t)(buffer[calc_read_next][8]<<8 | buffer[calc_read_next][9]))/16384.0);
+//		  gyro[1]=(((int16_t)(buffer[calc_read_next][10]<<8 | buffer[calc_read_next][11]))/16384.0);
+//		  gyro[2]=(((int16_t)(buffer[calc_read_next][12]<<8 | buffer[calc_read_next][13]))/16384.0);
+
+//		  gyro[0]=(((int16_t)(buffer[calc_read_next]<<8 | buffer[9+offset]))/16384.0);
+//		  gyro[1]=(((int16_t)(buffer[calc_read_next]<<8 | buffer[11+offset]))/16384.0);
+//		  gyro[2]=(((int16_t)(buffer[calc_read_next]<<8 | buffer[13+offset]))/16384.0);
+////
+//		printf("\n%.2f %.2f %.2f %.2f %.2f %.2f",acc[0],acc[1],acc[2], gyro[0],gyro[1],gyro[2]);
+//		  		printf("\n%.2f %.2f %.2f",acc[0],acc[1],acc[2]);
+//	  		printf("\n%.2f",acc[0]);
+//		  printf("\n%d %d",buffer[calc_read_next][0],buffer[calc_read_next][1]);
 
 
-		  if(offset==0)offset=14;
-		  else offset=0;
+////
+////
+////		  if(offset==0)offset=14;
+////		  else offset=0;
+
+	  		if(calc_read_next==0)calc_read_next=1;
+	  		else calc_read_next=0;
+//
+//	  printf("\nExcecuted!");
 	  }
+//	  osDelay(1);
   }
   /* USER CODE END 5 */
 }
