@@ -1,0 +1,17 @@
+../Core/Src/main.c:79:5:_write	2
+../Core/Src/main.c:88:9:MPU6050_WakeUp	2
+../Core/Src/main.c:96:9:MPU6050_Who	2
+../Core/Src/main.c:104:7:MPU6050_Read_AccX	2
+../Core/Src/main.c:118:7:MPU6050_Read_AccY	2
+../Core/Src/main.c:132:7:MPU6050_Read_AccZ	2
+../Core/Src/main.c:146:7:MPU6050_Read_GyroX	2
+../Core/Src/main.c:159:7:MPU6050_Read_GyroY	2
+../Core/Src/main.c:172:7:MPU6050_Read_GyroZ	2
+../Core/Src/main.c:191:5:main	1
+../Core/Src/main.c:248:6:SystemClock_Config	4
+../Core/Src/main.c:303:13:MX_I2C1_Init	4
+../Core/Src/main.c:351:13:MX_RTC_Init	5
+../Core/Src/main.c:434:13:MX_SPI1_Init	2
+../Core/Src/main.c:472:13:MX_USART2_UART_Init	2
+../Core/Src/main.c:507:13:MX_GPIO_Init	1
+../Core/Src/main.c:572:6:Error_Handler	1
