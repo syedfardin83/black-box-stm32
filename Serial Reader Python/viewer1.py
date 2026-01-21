@@ -2,7 +2,7 @@ import pandas as pd
 import plotly.express as px
 
 # Load your black box log
-df = pd.read_csv('your_recorded_file.csv')
+df = pd.read_csv('1.csv')
 
 # Plot Accelerometer and Gyroscope data
 fig = px.line(df, x='Time', y=['AccX', 'AccY', 'AccZ', 'GyroX', 'GyroY', 'GyroZ'], 
