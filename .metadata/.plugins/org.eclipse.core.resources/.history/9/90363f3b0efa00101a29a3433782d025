@@ -33,8 +33,6 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define n_buffers 3
-
 #define MPU6050_ADDR 0x68
 
 #define REG_PWR_MGMT_1 0x6b
@@ -76,7 +74,7 @@ const osSemaphoreAttr_t sem1_attributes = {
   .name = "sem1"
 };
 /* USER CODE BEGIN PV */
-//int n_buffers = 3;
+uint8_t n_buffers = 3;
 uint8_t buffer[n_buffers][14];
 float acc[3];
 float gyro[3];

@@ -33,8 +33,6 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define n_buffers 3
-
 #define MPU6050_ADDR 0x68
 
 #define REG_PWR_MGMT_1 0x6b
@@ -76,8 +74,7 @@ const osSemaphoreAttr_t sem1_attributes = {
   .name = "sem1"
 };
 /* USER CODE BEGIN PV */
-//int n_buffers = 3;
-uint8_t buffer[n_buffers][14];
+uint8_t buffer[2][14];
 float acc[3];
 float gyro[3];
 volatile int dma_read_next=0;
@@ -115,7 +112,7 @@ void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
 //    	printf("\nReading through DMA complete!");
     	HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_10);
     	osSemaphoreRelease(sem1Handle);
-    	dma_read_next = (dma_read_next==n_buffers-1)?0:dma_read_next+1;
+    	dma_read_next = (dma_read_next==0)?1:0;
     	HAL_I2C_Mem_Read_DMA(&hi2c1, MPU6050_ADDR << 1, REG_ACCEL_XOUT_H,
     	                             1, buffer[dma_read_next], 14);
     }
@@ -717,9 +714,8 @@ printf("\nStarting DMA...");
 ////		  if(offset==0)offset=14;
 ////		  else offset=0;
 
-//	  		if(calc_read_next==0)calc_read_next=1;
-//	  		else calc_read_next=0;
-		calc_read_next = (calc_read_next==n_buffers-1)?0:calc_read_next+1;
+	  		if(calc_read_next==0)calc_read_next=1;
+	  		else calc_read_next=0;
 //
 //	  printf("\nExcecuted!");
 	  }
