@@ -34,7 +34,6 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define n_buffers 3
-#define n_window 50
 
 #define MPU6050_ADDR 0x68
 
@@ -77,14 +76,12 @@ const osSemaphoreAttr_t sem1_attributes = {
   .name = "sem1"
 };
 /* USER CODE BEGIN PV */
+//int n_buffers = 3;
 uint8_t buffer[n_buffers][14];
 float acc[3];
 float gyro[3];
-float window[n_window][6];
 volatile int dma_read_next=0;
 float ff_threshhold=0.1;
-float net_acc=0;
-float net_gyro=0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -122,6 +119,103 @@ void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
     	HAL_I2C_Mem_Read_DMA(&hi2c1, MPU6050_ADDR << 1, REG_ACCEL_XOUT_H,
     	                             1, buffer[dma_read_next], 14);
     }
+}
+
+uint8_t MPU6050_WakeUp(I2C_HandleTypeDef *i2c){
+	uint8_t data = 0x0;
+	if(HAL_I2C_Mem_Write(i2c,MPU6050_ADDR<<1,REG_PWR_MGMT_1,1,&data,1,2000)==HAL_OK)
+		return 1;
+	else
+		return 0;
+}
+
+uint8_t MPU6050_Who(I2C_HandleTypeDef *i2c){
+	uint8_t data = 0;
+	if(HAL_I2C_Mem_Read(i2c,MPU6050_ADDR<<1,REG_WHO_AM_I,1,&data,1,2000)==HAL_OK)
+		return data;
+	else
+		return 0;
+}
+
+float MPU6050_Read_AccX(I2C_HandleTypeDef *i2c){
+	uint8_t data[2];
+
+	if(HAL_I2C_Mem_Read(i2c,MPU6050_ADDR<<1,REG_ACCEL_XOUT_H,1,data,2,100)==HAL_OK){
+//		printf("\nRead data!");
+		return (((int16_t)(data[0]<<8 | data[1]))/16384.0);
+//		return (int16_t)(data[1]);
+	}else{
+		printf("\nFailed to read!");
+		return 44;
+	}
+
+}
+
+float MPU6050_Read_AccY(I2C_HandleTypeDef *i2c){
+	uint8_t data[2];
+
+	if(HAL_I2C_Mem_Read(i2c,MPU6050_ADDR<<1,REG_ACCEL_YOUT_H,1,data,2,100)==HAL_OK){
+//		printf("\nRead data!");
+		return (((int16_t)(data[0]<<8 | data[1]))/16384.0);
+//		return (int16_t)(data[1]);
+	}else{
+		printf("\nFailed to read!");
+		return 44;
+	}
+
+}
+
+float MPU6050_Read_AccZ(I2C_HandleTypeDef *i2c){
+	uint8_t data[2];
+
+	if(HAL_I2C_Mem_Read(i2c,MPU6050_ADDR<<1,REG_ACCEL_ZOUT_H,1,data,2,100)==HAL_OK){
+//		printf("\nRead data!");
+		return (((int16_t)(data[0]<<8 | data[1]))/16384.0);
+//		return (int16_t)(data[1]);
+	}else{
+		printf("\nFailed to read!");
+		return 44;
+	}
+
+}
+
+float MPU6050_Read_GyroX(I2C_HandleTypeDef *i2c){
+	uint8_t data[2];
+
+		if(HAL_I2C_Mem_Read(i2c,MPU6050_ADDR<<1,REG_GYRO_XOUT_H,1,data,2,100)==HAL_OK){
+	//		printf("\nRead data!");
+			return (((int16_t)(data[0]<<8 | data[1]))/131.0);
+	//		return (int16_t)(data[1]);
+		}else{
+			printf("\nFailed to read!");
+			return 44;
+		}
+}
+
+float MPU6050_Read_GyroY(I2C_HandleTypeDef *i2c){
+	uint8_t data[2];
+
+		if(HAL_I2C_Mem_Read(i2c,MPU6050_ADDR<<1,REG_GYRO_YOUT_H,1,data,2,100)==HAL_OK){
+	//		printf("\nRead data!");
+			return (((int16_t)(data[0]<<8 | data[1]))/131.0);
+	//		return (int16_t)(data[1]);
+		}else{
+			printf("\nFailed to read!");
+			return 44;
+		}
+}
+
+float MPU6050_Read_GyroZ(I2C_HandleTypeDef *i2c){
+	uint8_t data[2];
+
+		if(HAL_I2C_Mem_Read(i2c,MPU6050_ADDR<<1,REG_GYRO_ZOUT_H,1,data,2,100)==HAL_OK){
+	//		printf("\nRead data!");
+			return (((int16_t)(data[0]<<8 | data[1]))/131.0);
+	//		return (int16_t)(data[1]);
+		}else{
+			printf("\nFailed to read!");
+			return 44;
+		}
 }
 
 /* USER CODE END 0 */
@@ -577,7 +671,8 @@ printf("\nStarting DMA...");
 	    	printf("\nDMA initiation failed!");
 //	int offset=0;
 	volatile int calc_read_next=0;
-	int calc=0;
+	float net_acc=0;
+	uint8_t ff_detected=0;
 	printf("\nDMA initialized!");
   /* Infinite loop */
   for(;;)
@@ -594,31 +689,7 @@ printf("\nStarting DMA...");
 		  gyro[1]=(((int16_t)(buffer[calc_read_next][10]<<8 | buffer[calc_read_next][11]))/16384.0);
 		  gyro[2]=(((int16_t)(buffer[calc_read_next][12]<<8 | buffer[calc_read_next][13]))/16384.0);
 
-//		printf("\n%.2f %.2f %.2f %.2f %.2f %.2f",acc[0],acc[1],acc[2], gyro[0],gyro[1],gyro[2]);
-		  if(calc<n_window-1){
-			  window[calc][0] = acc[0];
-			  window[calc][1] = acc[1];
-			  window[calc][2] = acc[2];
-
-			  window[calc][3] = gyro[0];
-			  window[calc][4] = gyro[1];
-			  window[calc][5] = gyro[2];
-
-			  calc++;
-
-		  }else if(calc==n_window-1){
-			  window[calc][0] = acc[0];
-			  			  window[calc][1] = acc[1];
-			  			  window[calc][2] = acc[2];
-
-			  			  window[calc][3] = gyro[0];
-			  			  window[calc][4] = gyro[1];
-			  			  window[calc][5] = gyro[2];
-
-						  calc++;
-
-			for
-		  }
+		printf("\n%.2f %.2f %.2f %.2f %.2f %.2f",acc[0],acc[1],acc[2], gyro[0],gyro[1],gyro[2]);
 
 
 //		  net_acc=sqrt(acc[0]*acc[0] + acc[1]*acc[1] + acc[2]*acc[2]);
