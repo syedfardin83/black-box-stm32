@@ -3,6 +3,7 @@
 An advanced embedded systems project designed to capture, process, and analyze physical motion in real-time. Built on the **STM32L072CZ** (Cortex-M0+), this project leverages industrial-grade data acquisition techniques to ensure zero-loss monitoring of high-speed gestures and impact events.
 
 **GitHub Repository:** [syedfardin83/black-box-stm32](https://github.com/syedfardin83/black-box-stm32)
+
 **Documentation:** [Notion site](https://syedfardin83.notion.site/Project-Black-Box-2dddcdc7e5e0803c9001f02b95c4b9d5)
 
 ---
