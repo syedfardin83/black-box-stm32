@@ -83,8 +83,12 @@ float gyro[3];
 float window[n_window][6];
 volatile int dma_read_next=0;
 float ff_threshhold=0.1;
-float net_acc=0;
-float net_gyro=0;
+
+//statistics variables
+float sums[6];
+float sum_sqs[6];
+float vars[6];
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -578,6 +582,7 @@ printf("\nStarting DMA...");
 //	int offset=0;
 	volatile int calc_read_next=0;
 	int calc=0;
+	int window_pos=0;
 	printf("\nDMA initialized!");
   /* Infinite loop */
   for(;;)
@@ -617,7 +622,43 @@ printf("\nStarting DMA...");
 
 						  calc++;
 
-			for
+			for(int i=0;i<n_window;i++){
+				for(int j=0;j<6;j++){
+					sums[j]+=window[i][j];
+					sum_sqs[j]+=(window[i][j]*window[i][j]);
+
+				}
+			}
+		  }else{
+				  sums[0] = sums[0]+acc[0]-window[pos][0];
+				  sums[1] = sums[1]+acc[1]-window[pos][1];
+				  sums[2] = sums[2]+acc[2]-window[pos][2];
+
+				  sums[0] = sums[3]+gyro[0]-window[pos][3];
+				  sums[1] = sums[4]+gyro[1]-window[pos][4];
+				  sums[2] = sums[5]+gyro[2]-window[pos][5];
+
+				  sum_sqs[0] = sum_sqs[0]+(acc[0]*acc[0])-(window[pos][0]*window[pos][0]);
+				  sum_sqs[1] = sum_sqs[1]+(acc[1]*acc[1])-(window[pos][1]*window[pos][1]);
+				  sum_sqs[2] = sum_sqs[2]+(acc[2]*acc[2])-(window[pos][2]*window[pos][2]);
+
+				  sum_sqs[0] = sum_sqs[3]+(gyro[0]*gyro[0])-(window[pos][3]*window[pos][3]);
+				  sum_sqs[1] = sum_sqs[4]+(gyro[1]*gyro[1])-(window[pos][4]*window[pos][4]);
+				  sum_sqs[2] = sum_sqs[5]+(gyro[2]*gyro[2])-(window[pos][5]*window[pos][5]);
+
+
+				  window[pos][0] = acc[0];
+				  window[pos][1] = acc[1];
+				  window[pos][2] = acc[2];
+
+				  window[pos][3] = gyro[0];
+				  window[pos][4] = gyro[1];
+				  window[pos][5] = gyro[2];
+
+
+				  pos=(pos==n_window-1)?0:pos+1;
+
+
 		  }
 
 
