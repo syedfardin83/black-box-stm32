@@ -89,9 +89,9 @@ float sum_sqs[6]={0};
 float vars[6]={0};
 
 //gesture thresholds
-float acc_drop_th = 0.08;
+float acc_drop_th = 0.1;
 float accz_shake_th = 0.2;
-float gyrox_shake_th = 0.15;
+float gyrox_shake_th = 2000;
 
 /* USER CODE END PV */
 
@@ -612,15 +612,12 @@ printf("\nStarting DMA...");
 
 		  pos=(pos==n_window-1)?0:pos+1;
 //		printf("\n%.2f %.2f %.2f %.2f %.2f %.2f ; Varience AccZ = %.2f",data[0],data[1],data[2], data[3],data[4],data[5],vars[2]);
-//		  printf("\nGyroX Var = %f",vars[3]);
 
 		  //Check drop
-		  if(sqrt(data[0]*data[0] + data[1]*data[1] + data[2]*data[2])<=acc_drop_th){
-			  printf("\nDrop detected!");
-		  }
+		  if(sqrt(data[0]*data[0] + data[1]*data[1] + data[2]*data[2])<=acc_drop_th)
 
 		//	Check shake
-		if(vars[2]>=accz_shake_th && vars[3]>=gyrox_shake_th){
+		if(vars[2]>=accz_shake_th){
 			printf("\nShake detected!");
 		}
 
