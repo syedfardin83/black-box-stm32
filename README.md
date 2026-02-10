@@ -4,6 +4,8 @@ An advanced embedded systems project designed to capture, process, and analyze p
 
 **GitHub Repository:** [syedfardin83/black-box-stm32](https://github.com/syedfardin83/black-box-stm32)
 
+**Documentation:** [Notion site](https://syedfardin83.notion.site/Project-Black-Box-2dddcdc7e5e0803c9001f02b95c4b9d5)
+
 ---
 
 ## The Vision
