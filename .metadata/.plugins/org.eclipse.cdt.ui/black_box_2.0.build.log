@@ -1,24 +1,17 @@
-22:23:06 **** Incremental Build of configuration Debug for project black_box_2.0 ****
+17:06:36 **** Incremental Build of configuration Debug for project black_box_2.0 ****
 make -j18 all 
 arm-none-eabi-gcc "../Core/Src/main.c" -mcpu=cortex-m0plus -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32L072xx -c -I../Core/Inc -I../Drivers/STM32L0xx_HAL_Driver/Inc -I../Drivers/STM32L0xx_HAL_Driver/Inc/Legacy -I../Middlewares/Third_Party/FreeRTOS/Source/include -I../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I../Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM0 -I../Drivers/CMSIS/Device/ST/STM32L0xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/main.d" -MT"Core/Src/main.o" --specs=nano.specs -mfloat-abi=soft -mthumb -o "Core/Src/main.o"
-../Core/Src/main.c: In function 'Calculate':
-../Core/Src/main.c:675:17: warning: unused variable 'ff_detected' [-Wunused-variable]
-  675 |         uint8_t ff_detected=0;
-      |                 ^~~~~~~~~~~
-../Core/Src/main.c:674:15: warning: unused variable 'net_acc' [-Wunused-variable]
-  674 |         float net_acc=0;
-      |               ^~~~~~~
 arm-none-eabi-gcc -o "black_box_2.0.elf" @"objects.list"   -mcpu=cortex-m0plus -T"C:\Users\Syed Fardin\Desktop\Coding\black-box-stm32\black_box_2.0\STM32L072CZYX_FLASH.ld" --specs=nosys.specs -Wl,-Map="black_box_2.0.map" -Wl,--gc-sections -static -u _printf_float --specs=nano.specs -mfloat-abi=soft -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 Finished building target: black_box_2.0.elf
  
 arm-none-eabi-size  black_box_2.0.elf 
 arm-none-eabi-objdump -h -S black_box_2.0.elf  > "black_box_2.0.list"
    text	   data	    bss	    dec	    hex	filename
-  62224	    472	   8928	  71624	  117c8	black_box_2.0.elf
+  66176	    472	  10200	  76848	  12c30	black_box_2.0.elf
 Finished building: default.size.stdout
  
 Finished building: black_box_2.0.list
  
 
-22:23:07 Build Finished. 0 errors, 2 warnings. (took 909ms)
+17:06:36 Build Finished. 0 errors, 0 warnings. (took 867ms)
 

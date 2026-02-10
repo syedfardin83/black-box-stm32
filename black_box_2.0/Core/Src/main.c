@@ -78,16 +78,15 @@ const osSemaphoreAttr_t sem1_attributes = {
 };
 /* USER CODE BEGIN PV */
 uint8_t buffer[n_buffers][14];
-float acc[3];
-float gyro[3];
-float window[n_window][6];
+float data[6];
+float window[n_window][6]={0};
 volatile int dma_read_next=0;
 float ff_threshhold=0.1;
 
 //statistics variables
-float sums[6];
-float sum_sqs[6];
-float vars[6];
+float sums[6]={0};
+float sum_sqs[6]={0};
+float vars[6]={0};
 
 /* USER CODE END PV */
 
@@ -569,9 +568,9 @@ static void MX_GPIO_Init(void)
 void Calculate(void *argument)
 {
   /* USER CODE BEGIN 5 */
-	uint8_t data = 0x0;
+	uint8_t ser_data = 0x0;
 	printf("\nWaking sensor!");
-	if(HAL_I2C_Mem_Write(&hi2c1,MPU6050_ADDR<<1,REG_PWR_MGMT_1,1,&data,1,2000)==HAL_OK)
+	if(HAL_I2C_Mem_Write(&hi2c1,MPU6050_ADDR<<1,REG_PWR_MGMT_1,1,&ser_data,1,2000)==HAL_OK)
 		printf("\nSensor woke up!");
 	else
 		printf("\nSensor wake up failed!");
@@ -581,8 +580,7 @@ printf("\nStarting DMA...");
 	    	printf("\nDMA initiation failed!");
 //	int offset=0;
 	volatile int calc_read_next=0;
-	int calc=0;
-	int window_pos=0;
+	int pos=0;
 	printf("\nDMA initialized!");
   /* Infinite loop */
   for(;;)
@@ -591,78 +589,89 @@ printf("\nStarting DMA...");
 //	  printf("\nWaiting for semaphore...");
 	  if(osSemaphoreAcquire(sem1Handle,osWaitForever)==osOK){
 //		  //Start calculation:
-		  acc[0]=(((int16_t)(buffer[calc_read_next][0]<<8 | buffer[calc_read_next][1]))/16384.0);
-		  acc[1]=(((int16_t)(buffer[calc_read_next][2]<<8 | buffer[calc_read_next][3]))/16384.0);
-		  acc[2]=(((int16_t)(buffer[calc_read_next][4]<<8 | buffer[calc_read_next][5]))/16384.0);
+		  data[0]=(((int16_t)(buffer[calc_read_next][0]<<8 | buffer[calc_read_next][1]))/16384.0);
+		  data[1]=(((int16_t)(buffer[calc_read_next][2]<<8 | buffer[calc_read_next][3]))/16384.0);
+		  data[2]=(((int16_t)(buffer[calc_read_next][4]<<8 | buffer[calc_read_next][5]))/16384.0);
 
-		  gyro[0]=(((int16_t)(buffer[calc_read_next][8]<<8 | buffer[calc_read_next][9]))/16384.0);
-		  gyro[1]=(((int16_t)(buffer[calc_read_next][10]<<8 | buffer[calc_read_next][11]))/16384.0);
-		  gyro[2]=(((int16_t)(buffer[calc_read_next][12]<<8 | buffer[calc_read_next][13]))/16384.0);
+		  data[3]=(((int16_t)(buffer[calc_read_next][8]<<8 | buffer[calc_read_next][9]))/16384.0);
+		  data[4]=(((int16_t)(buffer[calc_read_next][10]<<8 | buffer[calc_read_next][11]))/16384.0);
+		  data[5]=(((int16_t)(buffer[calc_read_next][12]<<8 | buffer[calc_read_next][13]))/16384.0);
 
-//		printf("\n%.2f %.2f %.2f %.2f %.2f %.2f",acc[0],acc[1],acc[2], gyro[0],gyro[1],gyro[2]);
-		  if(calc<n_window-1){
-			  window[calc][0] = acc[0];
-			  window[calc][1] = acc[1];
-			  window[calc][2] = acc[2];
+		  for(int i=0;i<6;i++){
+			  sums[i] = sums[i]+data[i]-window[pos][i];
+			  sum_sqs[i] = sum_sqs[i] + data[i]*data[i] - window[pos][i]*window[pos][i];
+			  vars[i] = (sum_sqs[i] - (sums[i]*sums[i]/n_window))/n_window;
 
-			  window[calc][3] = gyro[0];
-			  window[calc][4] = gyro[1];
-			  window[calc][5] = gyro[2];
-
-			  calc++;
-
-		  }else if(calc==n_window-1){
-			  window[calc][0] = acc[0];
-			  			  window[calc][1] = acc[1];
-			  			  window[calc][2] = acc[2];
-
-			  			  window[calc][3] = gyro[0];
-			  			  window[calc][4] = gyro[1];
-			  			  window[calc][5] = gyro[2];
-
-						  calc++;
-
-			for(int i=0;i<n_window;i++){
-				for(int j=0;j<6;j++){
-					sums[j]+=window[i][j];
-					sum_sqs[j]+=(window[i][j]*window[i][j]);
-
-				}
-			}
-		  }else{
-				  sums[0] = sums[0]+acc[0]-window[pos][0];
-				  sums[1] = sums[1]+acc[1]-window[pos][1];
-				  sums[2] = sums[2]+acc[2]-window[pos][2];
-
-				  sums[0] = sums[3]+gyro[0]-window[pos][3];
-				  sums[1] = sums[4]+gyro[1]-window[pos][4];
-				  sums[2] = sums[5]+gyro[2]-window[pos][5];
-
-				  sum_sqs[0] = sum_sqs[0]+(acc[0]*acc[0])-(window[pos][0]*window[pos][0]);
-				  sum_sqs[1] = sum_sqs[1]+(acc[1]*acc[1])-(window[pos][1]*window[pos][1]);
-				  sum_sqs[2] = sum_sqs[2]+(acc[2]*acc[2])-(window[pos][2]*window[pos][2]);
-
-				  sum_sqs[0] = sum_sqs[3]+(gyro[0]*gyro[0])-(window[pos][3]*window[pos][3]);
-				  sum_sqs[1] = sum_sqs[4]+(gyro[1]*gyro[1])-(window[pos][4]*window[pos][4]);
-				  sum_sqs[2] = sum_sqs[5]+(gyro[2]*gyro[2])-(window[pos][5]*window[pos][5]);
-
-
-				  window[pos][0] = acc[0];
-				  window[pos][1] = acc[1];
-				  window[pos][2] = acc[2];
-
-				  window[pos][3] = gyro[0];
-				  window[pos][4] = gyro[1];
-				  window[pos][5] = gyro[2];
-
-
-				  pos=(pos==n_window-1)?0:pos+1;
-
-
+			  window[pos][i] = data[i];
 		  }
 
+		  pos=(pos==n_window-1)?0:pos+1;
+		printf("\n%.2f %.2f %.2f %.2f %.2f %.2f ; Varience AccZ = %.2f",data[0],data[1],data[2], data[3],data[4],data[5],vars[2]);
+//		  printf("\nVarience AccX = %f",vars[0]);
 
-//		  net_acc=sqrt(acc[0]*acc[0] + acc[1]*acc[1] + acc[2]*acc[2]);
+//		  if(calc<n_window-1){
+//			  window[calc][0] = data[0];
+//			  window[calc][1] = data[1];
+//			  window[calc][2] = data[2];
+//
+//			  window[calc][3] = gyro[0];
+//			  window[calc][4] = gyro[1];
+//			  window[calc][5] = gyro[2];
+//
+//			  calc++;
+//
+//		  }else if(calc==n_window-1){
+//			  window[calc][0] = data[0];
+//			  			  window[calc][1] = data[1];
+//			  			  window[calc][2] = data[2];
+//
+//			  			  window[calc][3] = gyro[0];
+//			  			  window[calc][4] = gyro[1];
+//			  			  window[calc][5] = gyro[2];
+//
+//						  calc++;
+//
+//			for(int i=0;i<n_window;i++){
+//				for(int j=0;j<6;j++){
+//					sums[j]+=window[i][j];
+//					sum_sqs[j]+=(window[i][j]*window[i][j]);
+//
+//				}
+//			}
+//		  }else{
+//				  sums[0] = sums[0]+data[0]-window[pos][0];
+//				  sums[1] = sums[1]+data[1]-window[pos][1];
+//				  sums[2] = sums[2]+data[2]-window[pos][2];
+//
+//				  sums[0] = sums[3]+gyro[0]-window[pos][3];
+//				  sums[1] = sums[4]+gyro[1]-window[pos][4];
+//				  sums[2] = sums[5]+gyro[2]-window[pos][5];
+//
+//				  sum_sqs[0] = sum_sqs[0]+(data[0]*data[0])-(window[pos][0]*window[pos][0]);
+//				  sum_sqs[1] = sum_sqs[1]+(data[1]*data[1])-(window[pos][1]*window[pos][1]);
+//				  sum_sqs[2] = sum_sqs[2]+(data[2]*data[2])-(window[pos][2]*window[pos][2]);
+//
+//				  sum_sqs[0] = sum_sqs[3]+(gyro[0]*gyro[0])-(window[pos][3]*window[pos][3]);
+//				  sum_sqs[1] = sum_sqs[4]+(gyro[1]*gyro[1])-(window[pos][4]*window[pos][4]);
+//				  sum_sqs[2] = sum_sqs[5]+(gyro[2]*gyro[2])-(window[pos][5]*window[pos][5]);
+//
+//
+//				  window[pos][0] = data[0];
+//				  window[pos][1] = data[1];
+//				  window[pos][2] = data[2];
+//
+//				  window[pos][3] = gyro[0];
+//				  window[pos][4] = gyro[1];
+//				  window[pos][5] = gyro[2];
+//
+//
+//				  pos=(pos==n_window-1)?0:pos+1;
+//
+//
+//		  }
+
+
+//		  net_acc=sqrt(data[0]*data[0] + data[1]*data[1] + data[2]*data[2]);
 //		  if(ff_detected==0){
 //		  printf("\nNet Accel: %f",net_acc);
 //		  }
@@ -677,8 +686,8 @@ printf("\nStarting DMA...");
 //		  gyro[1]=(((int16_t)(buffer[calc_read_next]<<8 | buffer[11+offset]))/16384.0);
 //		  gyro[2]=(((int16_t)(buffer[calc_read_next]<<8 | buffer[13+offset]))/16384.0);
 ////
-//		  		printf("\n%.2f %.2f %.2f",acc[0],acc[1],acc[2]);
-//	  		printf("\n%.2f",acc[0]);
+//		  		printf("\n%.2f %.2f %.2f",data[0],data[1],data[2]);
+//	  		printf("\n%.2f",data[0]);
 //		  printf("\n%d %d",buffer[calc_read_next][0],buffer[calc_read_next][1]);
 
 
